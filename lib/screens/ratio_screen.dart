@@ -20,7 +20,11 @@ class _RatioScreenState extends State<RatioScreen> {
 
   List<TextEditingController> enterControllers = [];
 
-  // ⭐ OUTPUT FEATURE
+  // ⭐ UNITS
+  List<String> units = [];
+  List<String> unitOptions = ['g', 'kg', 'ml', 'l'];
+
+  // ⭐ OUTPUT
   double baseOutput = 1;
   double targetOutput = 1;
   TextEditingController baseOutputController = TextEditingController(text: "1");
@@ -54,6 +58,7 @@ class _RatioScreenState extends State<RatioScreen> {
     dishes[selectedDish!] = {
       "ingredients": ingredients,
       "base": base,
+      "units": units,
       "baseOutput": baseOutput,
     };
 
@@ -69,9 +74,11 @@ class _RatioScreenState extends State<RatioScreen> {
       selectedDish = name;
       ingredients = List<String>.from(dish["ingredients"]);
       base = List<double>.from(dish["base"]);
-      baseOutput = (dish["baseOutput"] ?? 1).toDouble();
-      targetOutput = baseOutput;
       result = List.from(base);
+
+      units = dish["units"] != null
+          ? List<String>.from(dish["units"])
+          : List.generate(base.length, (_) => "g");
 
       baseOutput = (dish["baseOutput"] ?? 1).toDouble();
       targetOutput = baseOutput;
@@ -101,6 +108,7 @@ class _RatioScreenState extends State<RatioScreen> {
               dishes[name] = {
                 "ingredients": ["Ingredient 1", "Ingredient 2", "Ingredient 3"],
                 "base": [1.0, 2.0, 3.0],
+                "units": ["g", "g", "g"],
                 "baseOutput": 1.0,
               };
 
@@ -132,6 +140,7 @@ class _RatioScreenState extends State<RatioScreen> {
               ingredients.clear();
               base.clear();
               result.clear();
+              units.clear();
               enterControllers.clear();
               saveData();
               Navigator.pop(context);
@@ -158,7 +167,9 @@ class _RatioScreenState extends State<RatioScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              setState(() => ingredients[index] = controller.text);
+              setState(() {
+                ingredients[index] = controller.text;
+              });
               saveCurrentDish();
               Navigator.pop(context);
             },
@@ -183,6 +194,7 @@ class _RatioScreenState extends State<RatioScreen> {
                 base.removeAt(i);
                 result.removeAt(i);
                 ingredients.removeAt(i);
+                units.removeAt(i);
                 enterControllers.removeAt(i);
               });
               saveCurrentDish();
@@ -199,6 +211,7 @@ class _RatioScreenState extends State<RatioScreen> {
 
   void updateValue(int index, String val) {
     if (val.isEmpty) return;
+
     double newVal = double.tryParse(val) ?? 0;
     double factor = newVal / base[index];
 
@@ -223,29 +236,9 @@ class _RatioScreenState extends State<RatioScreen> {
       c.clear();
     }
 
-    // ⭐ CLEAR OTHER ENTER FIELDS
-    for (int i = 0; i < enterControllers.length; i++) {
-      if (i != index) {
-        enterControllers[i].clear();
-      }
-    }
-
     setState(() {
       result = base.map((e) => e * factor).toList();
       targetOutput = newOutput;
-    });
-  }
-
-  // ⭐ SCALE BY OUTPUT
-  void updateOutput(String val) {
-    if (val.isEmpty) return;
-
-    targetOutput = double.tryParse(val) ?? baseOutput;
-
-    double factor = targetOutput / baseOutput;
-
-    setState(() {
-      result = base.map((e) => e * factor).toList();
     });
   }
 
@@ -258,6 +251,7 @@ class _RatioScreenState extends State<RatioScreen> {
       base.add(1);
       result.add(1);
       ingredients.add("Ingredient ${ingredients.length + 1}");
+      units.add("g");
       enterControllers.add(TextEditingController());
     });
 
@@ -313,6 +307,7 @@ class _RatioScreenState extends State<RatioScreen> {
                       padding: const EdgeInsets.all(6),
                       child: Column(
                         children: [
+
                           GestureDetector(
                             onTap: () => editIngredient(i),
                             child: Container(
@@ -325,22 +320,48 @@ class _RatioScreenState extends State<RatioScreen> {
                               ),
                             ),
                           ),
+
                           const SizedBox(height: 4),
+
                           Expanded(
                             child: SingleChildScrollView(
                               child: Column(
                                 children: [
+
                                   TextField(
-                                    controller: TextEditingController(text: base[i].toString()),
-                                    decoration: const InputDecoration(labelText: "Base", isDense: true),
+                                    controller: TextEditingController(
+                                        text: base[i].toString()),
+                                    decoration: InputDecoration(
+                                      labelText: "Base",
+                                      isDense: true,
+                                      suffix: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          value: units[i],
+                                          isDense: true,
+                                          items: unitOptions.map((u) {
+                                            return DropdownMenuItem(
+                                              value: u,
+                                              child: Text(u,
+                                                  style: const TextStyle(fontSize: 12)),
+                                            );
+                                          }).toList(),
+                                          onChanged: (v) {
+                                            setState(() {
+                                              units[i] = v!;
+                                            });
+                                            saveCurrentDish();
+                                          },
+                                        ),
+                                      ),
+                                    ),
                                     onChanged: (v) {
                                       base[i] = double.tryParse(v) ?? 1;
                                       saveCurrentDish();
                                     },
                                   ),
+
                                   const SizedBox(height: 4),
 
-                                  // ⭐ ENTER FIELD WITH CONTROLLER
                                   TextField(
                                     controller: enterControllers[i],
                                     decoration: const InputDecoration(
@@ -349,10 +370,19 @@ class _RatioScreenState extends State<RatioScreen> {
                                     ),
                                     onChanged: (v) => updateValue(i, v),
                                   ),
+
                                   const SizedBox(height: 6),
-                                  Text(result[i].toStringAsFixed(2),
-                                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  IconButton(icon: const Icon(Icons.delete), onPressed: () => removeVariable(i)),
+
+                                  Text(
+                                    result[i].toStringAsFixed(2),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+
+                                  IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: () => removeVariable(i),
+                                  ),
                                 ],
                               ),
                             ),
@@ -365,11 +395,9 @@ class _RatioScreenState extends State<RatioScreen> {
               ),
             ),
 
-          // ⭐ OUTPUT SECTION (ONLY ADDITION)
           if (selectedDish != null)
             Column(
               children: [
-
                 TextField(
                   controller: baseOutputController,
                   decoration: const InputDecoration(
@@ -379,18 +407,14 @@ class _RatioScreenState extends State<RatioScreen> {
                     saveCurrentDish();
                   },
                 ),
-
                 const SizedBox(height: 6),
-
                 TextField(
                   controller: targetOutputController,
                   decoration: const InputDecoration(
                       labelText: "Target Output (items needed)"),
                   onChanged: updateOutput,
                 ),
-
                 const SizedBox(height: 10),
-
                 ElevatedButton.icon(
                   onPressed: addVariable,
                   icon: const Icon(Icons.add),
